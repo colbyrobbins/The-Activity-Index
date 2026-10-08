@@ -218,3 +218,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project data and results (raw bikeshare data must not be redistributed)
+data/**/*
+!data/**/
+!data/**/.gitkeep
+results/*
+!results/.gitkeep
+archive/**/data/
+archive/**/results/
+
+.env
