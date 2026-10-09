@@ -7,7 +7,6 @@ and aggregate them to tracts, then attach the ACS controls and the prior-window 
 Needs: scripts 02, 04 and 05 done. Run from the repo root:  python scripts/06_build_tract_table.py
 Writes (gitignored): data/processed/stations.csv and data/processed/tract_table.csv
 """
-import re
 import sys
 import warnings
 from pathlib import Path
@@ -20,36 +19,10 @@ import pandas as pd  # noqa: E402
 
 from activity_index import config as cfg  # noqa: E402
 from activity_index.features import haversine_km, station_features, tract_features  # noqa: E402
-from activity_index.trips import fill_start_coords, load_gbfs_stations, load_station_history  # noqa: E402
+from activity_index.stations import clean_stations  # noqa: E402
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 ID = {"station_id": str, "start_id": str, "end_id": str}
-DEPOT = re.compile(r"\b(?:test|depot|warehouse|repair|cassette|map frame|mobile|workshop|temp|shop)\b", re.I)
-MAX_KM_FROM_CENTER = 60
-
-
-def station_table(city, names):
-    """Coordinates for every station of one city, with the source of each coordinate."""
-    s = names[names["city"] == city].copy()
-    df = pd.DataFrame({"start_station_id": s["station_id"], "start_station_name": s["name"],
-                       "start_lat": s["lat"], "start_lon": s["lon"]})
-    df["coord_source"] = np.where(df["start_lat"].notna(), "trip_file", None)
-    zips = sorted((cfg.RAW / "trips" / city).glob("*.zip"))
-    hist = load_station_history(zips) if zips else None
-    try:
-        gbfs = load_gbfs_stations(cfg.GBFS[city])
-    except Exception as e:
-        print(f"  [{city}] GBFS feed unavailable ({type(e).__name__}); continuing without it")
-        gbfs = None
-    for label, src in (("station_file", hist), ("gbfs", gbfs)):
-        before = df["start_lat"].notna()
-        df = fill_start_coords(df, src)
-        df.loc[df["start_lat"].notna() & ~before, "coord_source"] = label
-    out = df.rename(columns={"start_station_id": "station_id", "start_station_name": "name",
-                             "start_lat": "lat", "start_lon": "lon"})
-    out["city"] = city
-    out["trips"] = s["n"].values
-    return out
 
 
 def main():
@@ -65,16 +38,8 @@ def main():
         if city not in set(names["city"]):
             print(f"[{city}] no aggregated trips; run scripts/05_aggregate_trips.py")
             continue
-        t = station_table(city, names)
-        n0, trips0 = len(t), t["trips"].sum()
-        has = t["lat"].notna()
-        lat0, lon0 = cfg.CITY_CENTERS[city]
-        km = pd.Series(haversine_km(t["lat"], t["lon"], lat0, lon0), index=t.index)
-        keep = has & (km <= MAX_KM_FROM_CENTER) & ~t["name"].fillna("").str.contains(DEPOT)
-        report.append({"city": city, "stations": n0, "with_coords": int(has.sum()),
-                       "trip_share_with_coords": t.loc[has, "trips"].sum() / trips0,
-                       "dropped_depot_or_far": int((has & ~keep).sum())})
-        t = t[keep].copy()
+        t, rep = clean_stations(city, names)
+        report.append(rep)
         pts = gpd.GeoDataFrame(t, geometry=gpd.points_from_xy(t["lon"], t["lat"]), crs="EPSG:4326").to_crs(tracts.crs)
         j = gpd.sjoin(pts, tracts[tracts["city"] == city][["GEOID", "geometry"]], predicate="within", how="left")
         j = j[~j.index.duplicated()]

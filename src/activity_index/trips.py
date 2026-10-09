@@ -7,8 +7,12 @@ station files bundled in the zip, then the system's current GBFS feed.
 from __future__ import annotations
 
 import re
+import shutil
+import tempfile
+import time
 import xml.etree.ElementTree as ET
 import zipfile
+from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
@@ -134,15 +138,37 @@ def trip_keys(city_bucket: str, prefix: str):
     return [(k, s) for k, s in list_keys(city_bucket, prefix) if k.lower().endswith(".zip")]
 
 
-def download(url: str, dest, chunk: int = 1 << 20) -> Path:
+def city_year_keys(bucket: str, prefixes: list[str], year: int, skip_prefix: tuple[str, ...] = ()):
+    """Zip files of one year, trying several key prefixes (deduplicated). `skip_prefix` drops keys starting with any of them
+    (NYC publishes Jersey City as JC-...)."""
+    seen, out = set(), []
+    for pre in prefixes:
+        for k, s in trip_keys(bucket, pre.format(year=year)):
+            if k not in seen and not k.upper().startswith(tuple(x.upper() for x in skip_prefix)):
+                seen.add(k)
+                out.append((k, s or 0))
+    return out
+
+
+def download(url: str, dest, chunk: int = 1 << 20, retries: int = 8) -> Path:
+    """Download to dest, resuming a partial `.part` file after a dropped connection (S3 supports byte ranges)."""
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_name(dest.name + ".part")
-    with requests.get(url, stream=True, timeout=120) as r:
-        r.raise_for_status()
-        with open(tmp, "wb") as f:
-            for part in r.iter_content(chunk):
-                f.write(part)
+    for attempt in range(retries):
+        have = tmp.stat().st_size if tmp.exists() else 0
+        try:
+            with requests.get(url, stream=True, timeout=120, headers={"Range": f"bytes={have}-"} if have else {}) as r:
+                if r.status_code != 416:                       # 416: the .part file is already the whole file
+                    r.raise_for_status()
+                    with open(tmp, "ab" if (have and r.status_code == 206) else "wb") as f:
+                        for part in r.iter_content(chunk):
+                            f.write(part)
+            break
+        except (requests.exceptions.RequestException, OSError):
+            if attempt == retries - 1:
+                raise
+            time.sleep(min(30, 2 ** attempt))
     tmp.replace(dest)
     return dest
 
@@ -193,6 +219,13 @@ def read_trip_zip(zip_path, nrows: int | None = None, max_files: int | None = No
     nrows limits rows per CSV and max_files limits how many trip CSVs are read (for quick samples).
     Duplicate copies of the same month are skipped (see select_csvs).
     """
+    if is_nested(zip_path):
+        parts = []
+        for i, (_, df) in enumerate(iter_trip_csvs(zip_path, nrows)):
+            parts.append(df)
+            if max_files and i + 1 >= max_files:
+                break
+        return (pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=CANONICAL)), pd.DataFrame(columns=list(STATION_ALIASES))
     plan = plan_zip(zip_path)
     trip_files = plan["trip_files"][:max_files] if max_files else plan["trip_files"]
     trips, stations = [], []
@@ -210,8 +243,35 @@ def read_trip_zip(zip_path, nrows: int | None = None, max_files: int | None = No
     return trips_df, stations_df
 
 
+def _inner_zip_names(z) -> list[str]:
+    return sorted(n for n in z.namelist() if n.lower().endswith(".zip") and "__MACOSX" not in n and not Path(n).name.startswith("."))
+
+
+def is_nested(zip_path) -> bool:
+    """True for a zip of monthly zips with no CSV of its own (Citi Bike's 2021-2023 yearly files)."""
+    with zipfile.ZipFile(zip_path) as z:
+        return bool(_inner_zip_names(z)) and not any(n.lower().endswith(".csv") for n in z.namelist())
+
+
+@contextmanager
+def _extracted(z, name):
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / Path(name).name
+        with z.open(name) as src, open(p, "wb") as dst:
+            shutil.copyfileobj(src, dst, 1 << 20)
+        yield p
+
+
 def iter_trip_csvs(zip_path, nrows: int | None = None):
-    """Yield (csv_name, trips in canonical schema) one CSV at a time, so big zips never sit in memory."""
+    """Yield (csv_name, trips in canonical schema) one CSV at a time, so big zips never sit in memory.
+
+    A zip of monthly zips is opened month by month (each inner zip is unpacked to a temporary file and removed afterwards)."""
+    if is_nested(zip_path):
+        with zipfile.ZipFile(zip_path) as z:
+            for name in _inner_zip_names(z):
+                with _extracted(z, name) as inner:
+                    yield from iter_trip_csvs(inner, nrows)
+        return
     plan = plan_zip(zip_path)
     with zipfile.ZipFile(zip_path) as z:
         for name in plan["trip_files"]:

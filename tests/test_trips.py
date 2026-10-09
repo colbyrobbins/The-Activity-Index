@@ -138,3 +138,31 @@ def test_window_selection_via_env():
         assert w["t0"]["tract_vintage"] == 2010 and w["t1"]["tract_vintage"] == 2020
         assert w["t1"]["year"] - 4 > w["t0"]["year"]
         assert max(w["activity_years"]) <= w["t0"]["year"]
+
+
+def test_zip_of_monthly_zips_is_read_month_by_month(tmp_path):
+    import io
+    import zipfile
+
+    from activity_index.trips import is_nested, iter_trip_csvs, read_trip_zip
+
+    cols = "ride_id,rideable_type,started_at,ended_at,start_station_name,start_station_id,end_station_name,end_station_id,start_lat,start_lng,end_lat,end_lng,member_casual"
+
+    def month_zip(ym, n):
+        rows = "\n".join(f"r{i},classic_bike,{ym[:4]}-{ym[4:]}-05 08:0{i % 9}:00,{ym[:4]}-{ym[4:]}-05 08:3{i % 9}:00,A,5329.03,B,5329.04,40.7,-74.0,40.71,-74.01,member"
+                         for i in range(n))
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr(f"{ym}-citibike-tripdata_1.csv", cols + "\n" + rows)
+        return buf.getvalue()
+
+    outer = tmp_path / "2022-citibike-tripdata.zip"
+    with zipfile.ZipFile(outer, "w") as z:
+        z.writestr("2022-citibike-tripdata/202201-citibike-tripdata.zip", month_zip("202201", 5))
+        z.writestr("2022-citibike-tripdata/202202-citibike-tripdata.zip", month_zip("202202", 7))
+        z.writestr("__MACOSX/2022-citibike-tripdata/._202201-citibike-tripdata.zip", b"junk")
+    assert is_nested(outer)
+    got = [df for _, df in iter_trip_csvs(outer)]
+    assert [len(g) for g in got] == [5, 7] and got[0]["start_station_id"].iloc[0] == "5329.03"
+    trips, _ = read_trip_zip(outer, max_files=1)
+    assert len(trips) == 5

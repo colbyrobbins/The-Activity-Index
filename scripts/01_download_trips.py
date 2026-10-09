@@ -7,6 +7,7 @@ use --dry-run first to see sizes.
     python scripts/01_download_trips.py --dry-run
     python scripts/01_download_trips.py --cities chicago boston
     python scripts/01_download_trips.py --years 2016 2017
+    python scripts/01_download_trips.py --years 2022 2023 2024 --cities dc boston chicago   # nowcast years
 """
 import argparse
 import sys
@@ -15,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from activity_index import config as cfg  # noqa: E402
-from activity_index.trips import download, trip_keys  # noqa: E402
+from activity_index.trips import city_year_keys, download  # noqa: E402
 
 
 def main():
@@ -28,7 +29,8 @@ def main():
     plan = []
     for city in args.cities:
         for year in args.years:
-            keys = trip_keys(cfg.TRIP_BUCKETS[city], cfg.TRIP_PREFIXES[city].format(year=year))
+            keys = city_year_keys(cfg.TRIP_BUCKETS[city], [cfg.TRIP_PREFIXES[city]] + cfg.TRIP_PREFIXES_ALT.get(city, []), year,
+                                  skip_prefix=("JC",) if city == "nyc" else ())
             if not keys:
                 print(f"WARNING: no files for {city} {year}")
             plan += [(city, year, k, s or 0) for k, s in keys]
@@ -47,6 +49,8 @@ def main():
             continue
         print(f"[{i}/{len(plan)}] {city} {key} ({size / 1e6:.0f} MB)")
         download(f"{cfg.TRIP_BUCKETS[city].rstrip('/')}/{key}", dest)
+        if size and dest.stat().st_size != size:
+            print(f"  WARNING: {key} is {dest.stat().st_size} bytes, expected {size}; delete it and re-run")
     print("done")
 
 

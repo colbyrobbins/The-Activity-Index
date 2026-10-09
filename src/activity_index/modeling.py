@@ -110,8 +110,8 @@ def splits_for(df: pd.DataFrame, scheme: str):
     return list(GroupKFold(n_splits=5).split(df, groups=spatial_groups(df)))
 
 
-def oof_predictions(df, cols, kind, scheme, weights=None):
-    X, y = df[cols], df["rank_change"].values
+def oof_predictions(df, cols, kind, scheme, weights=None, target="rank_change"):
+    X, y = df[cols], df[target].values
     pred = np.full(len(df), np.nan)
     for tr, te in splits_for(df, scheme):
         m = fit_weighted(make_model(kind), X.iloc[tr], y[tr], None if weights is None else np.asarray(weights)[tr])
