@@ -54,6 +54,8 @@ TRIP_PREFIXES = {
     "boston": "{year}",
     "dc": "{year}",
 }
+# Extra key prefixes to try (Divvy renamed its files from 2020: 202201-divvy-tripdata.zip).
+TRIP_PREFIXES_ALT = {"chicago": ["{year}"]}
 
 # GBFS feeds list current stations with coordinates, used when trip files lack them.
 # Only stations still active today appear, so retired stations stay unmatched.
@@ -97,3 +99,37 @@ CITY_CENTERS = {"nyc": (40.7580, -73.9855), "chicago": (41.8819, -87.6278),
 # Trip-level filters: rides outside this range (minutes) are treated as tests, re-docks or lost bikes.
 MIN_TRIP_MIN, MAX_TRIP_MIN = 1, 180
 # A station counts as "mature" if it has trips in an active month of the first AND the last activity year.
+
+
+# ---------------------------------------------------------------------------------------------------
+# PUMA time study (docs/puma_study.md): yearly change in income for ~100,000-person areas (PUMAs)
+# predicted from yearly change in bikeshare use. Separate from the tract study above.
+# ---------------------------------------------------------------------------------------------------
+PUMA = {
+    # ACS 1-year tables exist for PUMAs every year except 2020. 2012-2021 use the 2010 PUMA boundaries.
+    "acs_years": list(range(2012, 2020)),
+    # Trip years aggregated for the panel; the outcome is the change from year-1 to year, for these years.
+    "bike_years": list(range(2015, 2020)),
+    "outcome_years": [2016, 2017, 2018, 2019],
+    "horizons": [2, 3],                 # multi-year outcome windows (script 15): income change over h years
+    "tiger_year": 2018,                 # TIGER vintage that carries the 2010 PUMA polygons
+    "min_mature_stations": 5,           # PUMA is in scope if >= this many stations are active in the first AND last bike year
+    "min_matched_stations": 3,          # a PUMA-year needs this many stations active in the same month of both years
+}
+PUMA_STATES = {"36": "nyc", "17": "chicago", "25": "boston", "11": "dc", "51": "dc"}   # state FIPS -> city
+
+
+# Nowcast areas (docs/nowcast.md): groups of PUMAs that cover the same ground before and after the 2020 PUMA redraw, so one income and
+# bikeshare series runs through 2024. 2020 and 2021 are COVID years: 2021 income is only an input (momentum for 2023), never a target.
+AREAS = {
+    "acs_old": list(range(2015, 2020)) + [2021],          # ACS 1-year on the 2010 PUMAs
+    "acs_new": [2022, 2023, 2024],                        # ACS 1-year on the 2020 PUMAs
+    "bike_years": list(range(2015, 2020)) + [2022, 2023, 2024],
+    "target_years": [2016, 2017, 2018, 2019, 2023, 2024],  # 2022 is a baseline year only
+    "min_iou": 0.95,                                      # old and new groups must cover the same ground to at least this overlap
+    "min_mature_stations": 3,                             # an area needs this many stations active in the first AND last bike year
+    "min_matched_stations": 3,                            # an area-year needs this many stations active in the same month of both years
+    "min_group": 3,                                       # valid areas needed in a city-year before it is usable
+    "link_radius_m": 75.0,                                # a retired station id and a new id this close (and never active together) are one station
+}
+
