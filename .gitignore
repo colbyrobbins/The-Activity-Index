@@ -225,6 +225,12 @@ data/**/*
 !data/**/.gitkeep
 results/*
 !results/.gitkeep
+# Final results are small aggregate tables and figures (no trip records), so they are kept with the code.
+!results/area_nowcast_summary.csv
+!results/area_nowcast_gains.csv
+!results/area_gains.csv
+!results/robustness/
+!results/decision/
 archive/**/data/
 archive/**/results/
 

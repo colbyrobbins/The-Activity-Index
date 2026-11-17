@@ -50,6 +50,8 @@ def load_area_inputs():
     num = DEP_COLS + ARR_COLS
     sm = (sm.groupby(["area_id", "key", "ym"], as_index=False)[num].sum()
           .rename(columns={"area_id": "puma", "key": "station_id"}))
+    # Saved so the weather and trip-purpose checks (scripts 25-27) can run without geopandas or the raw trips.
+    sm.assign(city=sm["puma"].map(city_of)).to_csv(cfg.INTERIM / "area_station_month.csv.gz", index=False)
 
     rep = pd.DataFrame(report)
     link = st.groupby("city").agg(station_ids=("station_id", "size"), keys=("key", "nunique"), ids_linked_across_eras=("linked", "sum"))

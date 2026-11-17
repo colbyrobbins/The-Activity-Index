@@ -1,17 +1,34 @@
 # The Activity Index
 
-Duke Alternative Data term project. Do bikeshare activity features from 2015-2018 (Citi Bike, Divvy, Bluebikes, Capital Bikeshare) predict which neighbourhoods gain income rank between ACS 2014-18 and 2019-23, beyond what free census data already says?
+Duke Alternative Data (AIPI) term project. Can public bikeshare trip data nowcast a neighbourhood's household income before the Census
+Bureau posts it?
 
-**Start with [docs/project_summary.md](docs/project_summary.md)** (tract study). The yearly PUMA panel study is in [docs/puma_study.md](docs/puma_study.md) (data, target, cleaning, EDA, baselines and how to read the results). Reasoning behind the design: [docs/project_spec.md](docs/project_spec.md).
+**Result in one paragraph.** For 20 areas in Boston, Chicago, DC and New York, adding one bikeshare feature (matched-station trip
+growth) to an income-history baseline lowers the average nowcast miss from $8,495 to $7,995, about eight months before the ACS 1-year
+figure is posted. The gain passes placebo tests (p = 0.001 to 0.006), survives a weather adjustment and shows up in every city and test
+year, but its interval across areas still includes zero, and the signal is negative: faster trip growth goes with slower income growth.
+Full write-up: **[docs/final_results.md](docs/final_results.md)**. Demo: open `demo/activity_index_demo.html` in a browser.
+
+## How the project got here
+| Stage | Question | Outcome | Write-up |
+|---|---|---|---|
+| 1. Tract study | Do 2015-18 bikeshare features predict a tract's income-rank change over five years? | No robust gain over free census data; 60% of the target is survey noise | [project_summary](docs/project_summary.md), [eda_findings](docs/eda_findings.md), [noise_ceiling](docs/noise_ceiling.md) |
+| 2. PUMA yearly study | Does yearly bikeshare change track yearly income change? | No bikeshare group beat income history | [puma_study](docs/puma_study.md) |
+| 3. Dollar nowcast (final) | Can year-T trips nowcast year-T income in dollars? | Trip growth helps a little; stress-tested | [nowcast](docs/nowcast.md), [final_results](docs/final_results.md) |
+
+The project began as a Strava-based idea; without Strava Metro access it moved to open bikeshare trip data
+(Citi Bike, Divvy, Capital Bikeshare, Bluebikes). Original design reasoning: [project_spec](docs/project_spec.md).
 
 ## Layout
 ```
-src/activity_index/   package: config, trips, census, crosswalk, features, noise, modeling
-scripts/              the pipeline, run in order (below); 11-14 are the PUMA time study
+src/activity_index/   package (data loading, features, panels, models, and the final checks: robustness, weather, trip_purpose, decision)
+scripts/              the final pipeline, run in number order (below)
+scripts/legacy/       stages 1 and 2, kept for the record (see scripts/legacy/README.md)
 tests/                offline unit tests
-docs/                 project_summary (read first), project_spec, eda_findings, noise_ceiling
-data/                 raw / interim / processed (gitignored; bikeshare licenses forbid redistribution)
-results/              tables and figures (gitignored)
+docs/                 write-ups; final_results.md is the one to read
+demo/                 the area screen (template.html is the source, activity_index_demo.html is built by script 29)
+results/              final tables and figures (robustness/, decision/, area_*.csv); everything else is gitignored
+data/                 raw / interim / processed (gitignored: bikeshare licenses forbid redistributing trip files)
 ```
 
 ## Setup
@@ -21,34 +38,27 @@ pip install -r requirements.txt
 # create a file named .env containing the line CENSUS_API_KEY=your_key (gitignored; never commit it)
 ```
 
-## Run (from the repo root)
+## Run the final pipeline (from the repo root)
 ```
-python scripts/01_download_trips.py       # trip files (about 5 GB)
-python scripts/02_fetch_acs_tiger.py      # ACS tables + tract polygons (also: --prior-only)
-python scripts/04_build_crosswalk.py      # 2020 tracts -> 2010 tracts
-python scripts/05_aggregate_trips.py      # trips -> station-month tables (resumable)
-python scripts/06_build_tract_table.py    # tract features and target
-python scripts/07_eda.py                  # figures + results/eda_summary.md
-python scripts/09_noise_ceiling.py        # ACS margins of error -> noise in the target
-python scripts/10_baselines.py            # baselines; writes results/baseline_summary.csv
-python -m pytest                          # unit tests
+python scripts/01_download_trips.py --years 2015 2016 2017 2018 2019 2022 2023 2024    # trip files (tens of GB; NYC 2024 alone is 8.7 GB)
+python scripts/05_aggregate_trips.py --panel       # station-month tables for the PUMA panel
+python scripts/05_aggregate_trips.py --areas       # same for the nowcast years
+python scripts/11_fetch_puma.py                    # ACS 1-year by PUMA + 2010 PUMA polygons
+python scripts/12_build_puma_panel.py              # PUMA panel (the area builder reads it)
+python scripts/20_build_areas.py                   # areas that can be followed across the 2020 PUMA redraw
+python scripts/21_build_area_panel.py              # area-year panel
+python scripts/22_area_nowcast.py                  # the nowcast: B0, B1, B2g, ... in dollars
+python scripts/23_area_gains.py                    # gain per area
+python scripts/24_placebo.py                       # placebo tests, interval, by city / year
+python scripts/25_fetch_weather.py                 # daily weather (Open-Meteo, no key)
+python scripts/26_weather_control.py               # weather-adjusted trip growth, warm vs cold months
+python scripts/27_trip_purpose.py                  # resident-like vs commuter-inflow trips
+python scripts/28_decision_screen.py               # the screen scored as a decision; which way the signal points
+python scripts/29_build_demo.py                    # demo/activity_index_demo.html
+python -m pytest                                   # unit tests
 ```
-`results/baseline_summary.csv` is the one table to look at (Chicago, NYC, DC; Boston is excluded because of noise, see the summary doc; `baseline_summary_with_boston.csv` is the sensitivity run); `baselines_metrics.csv` and `baselines_lift.csv` hold the full detail (LightGBM, unweighted fits, no-Boston sample, per-city scores).
-Robustness window (ACS 2015-19 to 2020-24): `ACTIVITY_WINDOW=robustness` (PowerShell: `$env:ACTIVITY_WINDOW = "robustness"`).
+`18_check_new_years.py` and `19_check_puma_boundaries.py` are the pre-flight checks that were run before extending the data to 2024.
 
-## PUMA time study (branch `time-study-data-pipeline`)
-```
-python scripts/01_download_trips.py --years 2019     # one extra trip year
-python scripts/05_aggregate_trips.py --panel
-python scripts/11_fetch_puma.py
-python scripts/12_build_puma_panel.py
-python scripts/13_puma_eda.py
-python scripts/14_puma_baselines.py                  # writes results/puma/baseline_summary.csv
-python scripts/15_puma_multiyear.py                  # multi-year outcome variant
-```
-
-## Nowcast (time-series, PUMA panel)
-```
-python scripts/22_area_nowcast.py                    # dollar nowcast on the area panel (scripts 20, 05 --areas, 21 first); see docs/nowcast.md
-```
-Estimates an area's year-T mean household income in dollars from its history and year-T bikeshare record, validated forward in time. (`17_puma_nowcast.py` and `16_levels_nowcast.py` are earlier versions kept for reference.)
+## Data sources
+Citi Bike, Divvy, Capital Bikeshare and Bluebikes public trip files; ACS 1-year and 5-year estimates and TIGER boundaries
+(US Census Bureau); Open-Meteo historical weather (ERA5). Links are in [project_spec](docs/project_spec.md) and the script headers.

@@ -1,0 +1,3 @@
+model,mae_dollars,gain_from_trip_growth,lo,hi
+B1 + income level,9063.054535640287,,,
+B1 + income level + trip growth,8556.86035803844,-506.1941776018466,-1035.6657281104958,53.83548574252006

@@ -1,4 +1,4 @@
-"""Baselines for the PUMA panel (scripts/14_puma_baselines.py).
+"""Baselines for the PUMA panel (scripts/legacy/puma_study/14_puma_baselines.py).
 
 Same ladder as the tract study, adapted to a yearly outcome:
   B0  income level relative to the city at the start of the year (+ square)        -> mean reversion only

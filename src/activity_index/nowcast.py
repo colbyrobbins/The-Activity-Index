@@ -1,4 +1,4 @@
-"""Levels nowcast at tract level (scripts/16_levels_nowcast.py).
+"""Levels nowcast at tract level (scripts/legacy/tract_study/16_levels_nowcast.py).
 
 Question: using bikeshare data for 2015-2018, how well can we estimate each tract's income LEVEL in the 2014-18 ACS window,
 (a) on its own, and (b) on top of everything that was already published before that window (the 2009-13 ACS)?

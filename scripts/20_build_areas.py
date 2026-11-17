@@ -5,7 +5,7 @@ split). ACS income and household totals are additive, so each area's income is t
 the year (2010 PUMAs through 2021, 2020 PUMAs from 2022). Only areas whose every 2010 PUMA is already in the bikeshare panel are kept,
 so station coverage is complete.
 
-Needs scripts 11 and 12 (acs1_puma.csv, pumas_2010.gpkg, puma_panel.csv) and a Census key (script 02). Run from the repo root:
+Needs scripts 11 and 12 (acs1_puma.csv, pumas_2010.gpkg, puma_panel.csv) and a Census key in .env (see README). Run from the repo root:
     python scripts/20_build_areas.py
 Writes data/raw/acs1_puma_post.csv (ACS 2021-2024), data/processed/areas.csv (membership), area_acs.csv (summed ACS), areas.gpkg (polygons).
 """
