@@ -11,7 +11,7 @@ data/processed/tract_noise.csv and results/noise_ceiling.csv. Run from the repo 
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402

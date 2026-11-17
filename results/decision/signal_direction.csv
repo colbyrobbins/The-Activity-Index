@@ -1,0 +1,11 @@
+what,n,value
+"model slope, test year 2018",20,-0.4714743275567993
+"model slope, test year 2019",40,-0.23767817046706674
+"model slope, test year 2023",60,-0.29501723087859266
+"model slope, test year 2024",80,-0.36873594061586973
+"correlation with income growth, all rows",100,-0.2526739388424527
+"same, after removing income momentum",100,-0.3591820401870734
+"correlation with income growth, boston",35,-0.28156923482906393
+"correlation with income growth, chicago",25,-0.0883542082891127
+"correlation with income growth, dc",20,-0.3795504568388896
+"correlation with income growth, nyc",20,-0.5358216988743105

@@ -10,7 +10,7 @@ Run from the repo root:  python scripts/04_build_crosswalk.py
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
 import geopandas as gpd  # noqa: E402
 import pandas as pd  # noqa: E402

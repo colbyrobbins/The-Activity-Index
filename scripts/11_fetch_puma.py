@@ -7,7 +7,7 @@ Outputs (gitignored):
     data/raw/acs1_puma.csv      every PUMA of the states in config.PUMA_STATES, years in config.PUMA["acs_years"]
     data/raw/pumas_2010.gpkg    PUMA polygons (GEOID, ALAND, city, geometry)
 
-Needs the Census key in .env (same as script 02). Run from the repo root:  python scripts/11_fetch_puma.py
+Needs the Census key in .env (see README, Setup). Run from the repo root:  python scripts/11_fetch_puma.py
 If the Census API says the PUMA geography is not available for the 1-year product, the message is printed as is
 and nothing is written: tell me and the fetch can switch to the PUMS microdata API.
 """

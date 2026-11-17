@@ -1,4 +1,4 @@
-"""PUMA nowcast, time-series design (scripts/17_puma_nowcast.py).
+"""PUMA nowcast, time-series design (scripts/legacy/puma_study/17_puma_nowcast.py).
 
 Question: in year T, can the trailing-12-month bikeshare record of a PUMA tell us its year-T income before the ACS publishes it,
 beyond what the PUMA's own published history already says?

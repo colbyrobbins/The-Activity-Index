@@ -1,4 +1,4 @@
-"""Models, validation and metrics for the noise-aware baselines (scripts/10_baselines.py)."""
+"""Models, validation and metrics for the noise-aware baselines (scripts/legacy/tract_study/10_baselines.py)."""
 from __future__ import annotations
 
 import numpy as np
